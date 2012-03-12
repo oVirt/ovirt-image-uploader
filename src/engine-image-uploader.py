@@ -23,9 +23,10 @@ from pwd import getpwnam
 import getpass
 import tarfile
 from lxml import etree
-from schemas import api
 from ovf import ovfenvelope
 from ovf.ovfenvelope import *
+from ovirtsdk.api import API
+from ovirtsdk.xml import params
 
 
 
@@ -39,8 +40,8 @@ NFS_USER = 'vdsm'
 NUMERIC_VDSM_ID = 36
 MOUNT='/bin/mount'
 UMOUNT='/bin/umount'
-DEFAULT_CONFIGURATION_FILE='/etc/engine/imageuploader.conf'
-DEFAULT_LOG_FILE='/var/log/engine/engine-image-uploader.log'
+DEFAULT_CONFIGURATION_FILE='/etc/ovirt-engine/imageuploader.conf'
+DEFAULT_LOG_FILE='/var/log/ovirt-engine/engine-image-uploader.log'
 
 def multilog(logger, msg):
      for line in str(msg).splitlines():
@@ -318,6 +319,7 @@ class Configuration(dict):
 class ImageUploader(object):
 
     def __init__(self, conf):
+        self.api = None
         self.configuration = conf
         self.caller = Caller(self.configuration)
         if self.configuration.command == Commands.LIST:
@@ -329,33 +331,40 @@ class ImageUploader(object):
 
 
 
-    def _fetch_from_api(self, method):
+    def _initialize_api(self):
         """
         Make a RESTful request to the supplied oVirt method.
         """
         if not self.configuration:
             raise Exception("No configuration.")
 
-        try:
-            self.configuration.prompt("engine", msg=_("hostname of oVirt Engine"))
-            self.configuration.prompt("user", msg=_("REST API username for oVirt Engine"))
-            self.configuration.getpass("passwd", msg=_("REST API password for the %s oVirt Engine user") % self.configuration.get("user"))
-        except Configuration.SkipException:
-            raise Exception("Insufficient information provided to communicate with the oVirt Engine REST API.")
+        if self.api is None:
+            # The API has not been initialized yet.
+            try:
+                self.configuration.prompt("engine", msg=_("hostname of oVirt Engine"))
+                self.configuration.prompt("user", msg=_("REST API username for oVirt Engine"))
+                self.configuration.getpass("passwd", msg=_("REST API password for the %s oVirt Engine user") % self.configuration.get("user"))
+            except Configuration.SkipException:
+                raise Exception("Insufficient information provided to communicate with the oVirt Engine REST API.")
 
-        url = "https://" + self.configuration.get("engine") + "/api" + method
-        req = urllib2.Request(url)
-        logging.debug("URL is %s" % req.get_full_url())
-
-        # Not using the AuthHandlers because they actually make two requests
-        auth = "%s:%s" % (self.configuration.get("user"), self.configuration.get("passwd"))
-        #logging.debug("HTTP auth is = %s" % auth)
-
-        auth = base64.encodestring(auth).strip()
-        req.add_header("Authorization", "Basic %s" % auth)
-
-        fp = urllib2.urlopen(req)
-        return fp.read()
+            url = "https://" + self.configuration.get("engine") + "/api"
+            self.api = API(url=url,
+                           username=self.configuration.get("user"),
+                           password=self.configuration.get("passwd"))
+            try:
+                pi = self.api.get_product_info()
+                if pi is not None:
+                    vrm = '%s.%s.%s' % (pi.get_version().get_major(),
+                                        pi.get_version().get_minor(),
+                                        pi.get_version().get_revision())
+                    logging.debug("API Vendor(%s)\tAPI Version(%s)" %  (pi.get_vendor(), vrm))
+                else:
+                    logging.error(_("Unable to connect to REST API."))
+                    return False
+            except Exception, e:
+                logging.error(_("Unable to connect to REST API.  Message: %s") %  e)
+                return False
+        return True
 
     def list_all_export_storage_domains(self):
         """
@@ -364,27 +373,24 @@ class ImageUploader(object):
         def get_name(ary):
             return ary[0]
 
-        dcXML = self._fetch_from_api("/datacenters")
-        logging.debug("Returned XML is\n%s" % dcXML)
-        dc = api.parseString(dcXML)
-        dcAry = dc.get_data_center()
+        if not self._initialize_api():
+            return
+
+        dcAry = self.api.datacenters.list()
         if dcAry is not None:
              imageAry = [ ]
              for dc in dcAry:
                  dcName = dc.get_name()
-                 domainXml = self._fetch_from_api("/datacenters/%s/storagedomains" %
-                                                  dc.get_id())
-                 logging.debug("Returned XML is\n%s" % domainXml)
-                 sdom = api.parseString(domainXml)
-                 domainAry = sdom.get_storage_domain()
+                 logging.debug("Found a DC named(%s)" % dcName)
+                 domainAry = dc.storagedomains.list()
                  if domainAry is not None:
                      for domain in domainAry:
                          if domain.get_type() == 'export':
                              status = domain.get_status()
                              if status is not None:
                                  imageAry.append([domain.get_name(),
-                                                dcName,
-                                                status.get_state()])
+                                                  dcName,
+                                                  status.get_state()])
                              else:
                                  logging.debug("the storage domain didn't have a status element.")
                  else:
@@ -410,25 +416,19 @@ class ImageUploader(object):
         Returns:
           (host, id, path)
         """
-        query = urllib.quote("name=%s" % exportdomain)
-        domainXml = self._fetch_from_api("/storagedomains?search=%s" % query)
-        logging.debug("Returned XML is\n%s" % domainXml)
-        sdom = api.parseString(domainXml)
-        #sdom = api.parse('exportdomain.xml')
-        domainAry = sdom.get_storage_domain()
-        if domainAry is not None and len(domainAry) == 1:
-            if domainAry[0].get_type() != 'export':
+        if not self._initialize_api():
+            return
+        sd = self.api.storagedomains.get(exportdomain)
+        if sd is not None:
+            if sd.get_type() != 'export':
                 raise Exception(_("The %s storage domain supplied is not of type 'export'" % (exportdomain)))
-            address = None
-            path = None
-            id = domainAry[0].get_id()
-            storage = domainAry[0].get_storage()
+            id = sd.get_id()
+            storage = sd.get_storage()
             if storage is not None:
                 address = storage.get_address()
                 path = storage.get_path()
             else:
                 raise Exception(_("A storage element was not found for the %s export domain." % exportdomain))
-
             logging.debug('id=%s address=%s path=%s' % (id, address, path))
             return (id, address, path)
         else:
