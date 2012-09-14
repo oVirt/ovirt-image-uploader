@@ -51,7 +51,7 @@ Options in this group are used to gain authorization to the oVirt Engine REST AP
 .IP "\fB\-u user@engine.example.com, \-\-user=user@engine.example.com\fP"
 Indicates the user name to use with the oVirt Engine REST API. This should be in UPN format.\&
 .IP "\fB\-r engine.example.com, \-\-engine=engine.example.com\fP"
-Hostname or IP address of the oVirt Engine (default=localhost:8443).\&
+Hostname or IP address of the oVirt Engine (default=localhost:443).\&
 .SH "EXPORT STORAGE DOMAIN CONFIGURATION OPTIONS"
 Options in this group specify the export storage domain to which OVF files should be uploaded.\&
 .IP "\fB\-e EXPORT_STORAGE_DOMAIN, \-\-export\-domain=EXPORT_STORAGE_DOMAIN\fP"
@@ -116,7 +116,7 @@ passwd=L1ghtNingFst1!
 .br
 ## hostname or IP address of the oVirt Engine
 .br
-engine=myengine.example.com:8443
+engine=myengine.example.com:443
 .SH "RETURN VALUES"
 .IP "\fB0\fP"
 The program ran to completion with no errors.\&

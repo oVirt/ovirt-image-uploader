@@ -1329,8 +1329,8 @@ _("""The options in the oVirt Engine group are used by the tool to gain authoriz
                            help=SUPPRESS_HELP)
 
     engine_group.add_option("-r", "--engine", dest="engine", metavar="engine.example.com",
-            help=_("""hostname or IP address of the oVirt Engine (default=localhost:8443)."""),
-            default="localhost:8443")
+            help=_("""hostname or IP address of the oVirt Engine (default=localhost:443)."""),
+            default="localhost:443")
 
     export_group = OptionGroup(parser,
                               _("Export Storage Domain Configuration"),
