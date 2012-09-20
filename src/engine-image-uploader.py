@@ -1406,7 +1406,6 @@ use the oVirt engine to add NICs back and the oVirt engine will ensure that ther
     except Exception, e:
         logging.error("%s" % e)
         logging.info(_("Use the -h option to see usage."))
-        parser.print_help()
         if conf and (conf.get("verbose")):
             logging.debug(_("Configuration:"))
             logging.debug(_("command: %s") % conf.command)
