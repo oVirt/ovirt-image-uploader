@@ -353,7 +353,7 @@ class ImageUploader(object):
                 self.api = API(url=url,
                                username=self.configuration.get("user"),
                                password=self.configuration.get("passwd"),
-                               ca_file=self.configuration.get("engine_ca"),
+                               ca_file=self.configuration.get("cert_file"),
                                insecure=self.configuration.get("insecure"))
 
                 pi = self.api.get_product_info()
@@ -1295,7 +1295,7 @@ following characteristics:
                       help=_("path to configuration file (default=%s)" % DEFAULT_CONFIGURATION_FILE),
                       metavar=_("PATH"))
 
-    parser.add_option("", "--engine-ca", dest="engine_ca",
+    parser.add_option("", "--cert-file", dest="cert_file",
                       help="The CA certificate used to validate the engine. (default=/etc/pki/ovirt-engine/ca.pem)",
                       metavar="/etc/pki/ovirt-engine/ca.pem",
                       default="/etc/pki/ovirt-engine/ca.pem")
