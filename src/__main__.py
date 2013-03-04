@@ -483,7 +483,8 @@ class ImageUploader(object):
             os.seteuid(0)
             os.setegid(0)
 
-    def space_test_ovf(self, ovf_file, dest_dir):
+    @staticmethod
+    def space_test_ovf(ovf_file, dest_dir):
         '''Checks to see if there is enough room to decompress the tgz into dest_dir'''
         tar = tarfile.open(ovf_file, "r:gz")
         size_in_bytes = 0
@@ -493,7 +494,7 @@ class ImageUploader(object):
                     size_in_bytes += tarinfo.size
         except:
             logging.error(_("Unable to calculate the decompressed size of %s.") % ovf_file)
-            return False
+            return (False,-1)
         finally:
             tar.close()
 
@@ -1208,6 +1209,19 @@ class ImageUploader(object):
                         if self.unpack_ovf(ovf_file, ovf_extract_dir):
                             if (self.update_ovf_xml(ovf_extract_dir)):
                                 self.copy_files_nfs(ovf_extract_dir, dest_dir, address, ovf_file_size, ovf_file)
+                    else:
+                        if ovf_file_size > 0:
+                            ExitCodes.exit_code = ExitCodes.CRITICAL
+                            size_needed_mb = "%1.f" % \
+                                (float(ovf_file_size) / float(pow(2, 20)))
+                            logging.error(_(
+                                "Not enough space in {tempdir}:"
+                                " {size_needed}Mb are needed.").format(
+                                    tempdir=tempfile.gettempdir(),
+                                    size_needed=size_needed_mb
+                                )
+                            )
+
                 finally:
                     try:
                         logging.debug("Cleaning up OVF extract directory %s" % ovf_extract_dir)
