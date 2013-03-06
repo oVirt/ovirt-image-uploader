@@ -75,7 +75,7 @@ The virtual machine uploaded to your oVirt Engine with the \fBengine\-image\-upl
 .PP
 3. Login to the machine that contains to the export domain, find the root of the NFS share and change to the subdirectory under that mount point. (If you started with a new export domain, only one directory should be there, representing a UUID.) It should contain images/ and master/ directories.
 .PP
-4. Run the following tar command command to create the tar/gzip ovf archive: \fBtar \-zcvf my.ovf images/ master/\fP
+4. Run the following tar command to create the tar/gzip ovf archive: \fBtar \-zcvf my.ovf images/ master/\fP
 .PP
 5. Anyone you give the resulting ovf file to (in this example, called my.ovf) can import it to a oVirt Engine using the \fBengine\-image\-uploader upload\fP command.
 .SH "EXAMPLES"
