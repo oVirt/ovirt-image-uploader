@@ -35,7 +35,7 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE
 AM_GNU_GETTEXT_VERSION([0.17])
-AM_GNU_GETTEXT([external])
+AM_GNU_GETTEXT
 
 AC_ARG_ENABLE(
 	[python-syntax-check],
@@ -76,6 +76,7 @@ AC_CONFIG_FILES([
 	ovirt-image-uploader.spec
 	src/Makefile
 	src/ovf/Makefile
+	intl/Makefile
 	po/Makefile.in
 ])
 AC_OUTPUT
