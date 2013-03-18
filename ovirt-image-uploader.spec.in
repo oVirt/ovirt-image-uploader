@@ -53,6 +53,7 @@ make %{?_smp_mflags} install DESTDIR="%{buildroot}"
 %doc AUTHORS
 %doc COPYING
 %config(noreplace) %{_sysconfdir}/ovirt-engine/imageuploader.conf
+%{_sysconfdir}/ovirt-engine/imageuploader.conf.d/.keep
 %{python_sitelib}/ovirt_image_uploader/*.py*
 %{python_sitelib}/ovirt_image_uploader/ovf/*.py*
 %{_bindir}/engine-image-uploader

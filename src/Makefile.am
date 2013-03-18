@@ -40,6 +40,11 @@ dist_engineconfig_DATA = \
 	imageuploader.conf \
 	$(NULL)
 
+confddir=$(engineconfigdir)/imageuploader.conf.d
+dist_confd_DATA =\
+	.keep \
+	$(NULL)
+
 all-local: \
 	python-syntax-check \
 	$(NULL)
