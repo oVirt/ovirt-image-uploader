@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 #
 # Generated Fri Dec  2 15:05:18 2011 by generateDS.py version 2.7b.
 #
