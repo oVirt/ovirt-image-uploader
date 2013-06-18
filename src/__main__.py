@@ -106,7 +106,6 @@ class Caller(object):
             raise Exception(stderr)
 
 
-
 class Configuration(dict):
     """This class is a dictionary subclass that knows how to read and """
     """handle our configuration. Resolution order is defaults -> """
@@ -221,6 +220,25 @@ class Configuration(dict):
 
         cp = ConfigParser.ConfigParser()
         cp.read(configs)
+
+        #backward compatibility with existing setup
+        if cp.has_option('ImageUploader', 'rhevm'):
+            if not cp.has_option('ImageUploader', 'engine'):
+                cp.set(
+                    'ImageUploader',
+                    'engine',
+                    cp.get('ImageUploader', 'rhevm')
+                )
+                logging.warning(
+                    _(
+                        'A deprecated configuration key has been found. '
+                        'Please replace the deprecated key, \'rhevm\', '
+                        'with the new one \'engine\' in {configFiles}'
+                    ).format(
+                        configFiles=', '.join(configs)
+                    )
+                )
+            cp.remove_option('ImageUploader', 'rhevm')
 
         # we want the items from the ImageUploader section only
         try:
