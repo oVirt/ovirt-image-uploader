@@ -1294,23 +1294,58 @@ if __name__ == '__main__':
     gettext.textdomain(APP_NAME)
     _ = gettext.gettext
 
-    usage_string = "\n".join(("%prog [options] list ",
-                              "       %prog [options] upload [file]"))
+    usage_string = _("""
+%prog [options] list
+%prog [options] upload [file]
+""")
 
-    desc = _("""The image uploader can be used to list export storage domains and upload OVF files to
-export storage domains. This tool only supports OVF files created by oVirt engine.  OVF archives should have the
-following characteristics:
-1. The OVF archive must be created with gzip compression.
-2. The archive must have the following internal layout:
-    |-- images
-    |   |-- <Image Group UUID>
-    |        |--- <Image UUID (this is the disk image)>
-    |        |--- <Image UUID (this is the disk image)>.meta
-    |-- master
-    |   |---vms
-    |       |--- <UUID>
-    |             |--- <UUID>.ovf
+    desc = _("""DESCRIPTION
+Using  the engine-image-uploader command, you can list export storage domains
+and upload virtual machines in Open Virtualization Format (OVF) to a oVirt
+Engine. The tool only supports OVF files created by oVirt.
 
+OVF archives should have the following characteristics:
+
+* gzip compressed
+        The OVF archive must be created with gzip compression.
+
+* internal layout
+        The archive should contain images and master directories that are in \
+the following format:
+        |-- images
+        |   |-- <Image Group UUID>
+        |        |--- <Image UUID (this is the disk image)>
+        |        |--- <Image UUID (this is the disk image)>.meta
+        |-- master
+        |   |---vms
+        |       |--- <UUID>
+        |             |--- <UUID>.ovf
+
+EXAMPLES
+Here is an example of how to use engine-image-uploader to list storage domains:
+
+# engine-image-uploader list
+Please provide the REST API username for oVirt Engine: admin@internal
+Please provide the REST API password for the admin@internal oVirt Engine \
+user: **********
+Export Storage Domain Name | Datacenter  | Export Domain Status
+myexportdom                | Myowndc     | active
+
+To upload an Open Virtualization Format (ovf) file, you need to enter an NFS \
+server name (-n NFSSERVER) or export domain (-e EXPORT_STORAGE_DOMAIN) and \
+the name of the .ovf file:
+
+# engine-image-uploader -e myexportdom upload myrhel6.ovf
+Please provide the REST API username for oVirt Engine: admin@internal
+Please provide the REST API password for the admin@internal oVirt Engine \
+user: **********
+
+You can also rename the image using the -N option:
+
+# engine-image-uploader -N new_name -e myexportdom upload myrhel6.ovf
+Please provide the REST API username for oVirt Engine: admin@internal
+Please provide the REST API password for the admin@internal oVirt Engine \
+user: **********
 """)
 
     epilog_string = """\nReturn values:
