@@ -22,6 +22,7 @@ import re
 from pwd import getpwnam
 import getpass
 import tarfile
+import time
 from lxml import etree
 from ovf import ovfenvelope
 from ovf.ovfenvelope import *
@@ -29,12 +30,10 @@ from ovirtsdk.api import API
 from ovirtsdk.xml import params
 from ovirtsdk.infrastructure.errors import RequestError, ConnectionError, NoCertificatesError
 
+from ovirt_image_uploader import config
 
 
 APP_NAME = "engine-image-uploader"
-STREAM_LOG_FORMAT = '%(levelname)s: %(message)s'
-FILE_LOG_FORMAT = '%(asctime)s::%(levelname)s::%(module)s::%(lineno)d::%(name)s:: %(message)s'
-FILE_LOG_DSTMP = '%Y-%m-%d %H:%M:%S'
 NFS_MOUNT_OPTS = '-t nfs -o rw,sync,soft'
 NFS_UMOUNT_OPTS = '-t nfs -f '
 NFS_USER = 'vdsm'
@@ -42,7 +41,24 @@ NUMERIC_VDSM_ID = 36
 MOUNT='/bin/mount'
 UMOUNT='/bin/umount'
 DEFAULT_CONFIGURATION_FILE='/etc/ovirt-engine/imageuploader.conf'
-DEFAULT_LOG_FILE='/var/log/ovirt-engine/engine-image-uploader.log'
+
+STREAM_LOG_FORMAT = '%(levelname)s: %(message)s'
+FILE_LOG_FORMAT = (
+    '%(asctime)s::'
+    '%(levelname)s::'
+    '%(module)s::'
+    '%(lineno)d::'
+    '%(name)s::'
+    ' %(message)s'
+)
+FILE_LOG_DSTMP = '%Y-%m-%d %H:%M:%S'
+DEFAULT_LOG_FILE = os.path.join(
+    config.DEFAULT_LOG_DIR,
+    '{prefix}-{timestamp}.log'.format(
+        prefix=config.LOG_PREFIX,
+        timestamp=time.strftime('%Y%m%d%H%M%S'),
+    )
+)
 
 def multilog(logger, msg):
      for line in str(msg).splitlines():
