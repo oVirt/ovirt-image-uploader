@@ -15,62 +15,25 @@
 # limitations under the License.
 #
 
-include $(top_srcdir)/build/python.inc
-
 MAINTAINERCLEANFILES = \
 	$(srcdir)/Makefile.in \
 	$(NULL)
 
 EXTRA_DIST = \
-	config.py.in \
-	sample.ovf \
+	ovirt-image-uploader.in \
 	$(NULL)
 
 CLEANFILES = \
-	config.py \
+	ovirt-image-uploader \
 	$(NULL)
 
-SUBDIRS = \
-	ovf \
-	logrotate.d \
+nodist_logrotate_DATA= \
+	ovirt-image-uploader \
 	$(NULL)
 
-dist_ovirtimageuploaderlib_PYTHON = \
-	__init__.py \
-	__main__.py \
-	$(NULL)
+logrotatedir=$(sysconfdir)/logrotate.d
 
-nodist_ovirtimageuploaderlib_PYTHON = \
-	config.py \
-	$(NULL)
-
-dist_man_MANS = \
-	engine-image-uploader.8 \
-	$(NULL)
-
-dist_engineconfig_DATA = \
-	imageuploader.conf \
-	$(NULL)
-
-config.py: config.py.in
+ovirt-image-uploader: ovirt-image-uploader.in
 	$(SED) \
 	-e 's|@localstatedir[@]|$(localstatedir)|g' \
 	-e 's|@PACKAGE_NAME[@]|$(PACKAGE_NAME)|g' < $< > $@
-
-all-local: \
-	python-syntax-check \
-	$(NULL)
-
-clean-local: \
-	python-clean \
-	$(NULL)
-
-install-data-hook:
-	$(MKDIR_P) "$(DESTDIR)$(bindir)"
-	$(MKDIR_P) "$(DESTDIR)$(localstatedir)/log/ovirt-engine/$(PACKAGE_NAME)"
-	chmod a+x "$(DESTDIR)$(ovirtimageuploaderlibdir)/__main__.py"
-	rm -f "$(DESTDIR)$(bindir)/engine-image-uploader"
-	$(LN_S) "$(ovirtimageuploaderlibdir)/__main__.py" "$(DESTDIR)$(bindir)/engine-image-uploader"
-
-uninstall-hook:
-	rm -f "$(DESTDIR)$(bindir)/engine-image-uploader"

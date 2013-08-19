@@ -15,8 +15,8 @@ config.sub
 ABOUT-NLS
 
 intl
-
 tmp.*
 *.pyc
 *.pyo
 *~
+src/config.py

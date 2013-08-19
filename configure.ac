@@ -75,6 +75,7 @@ AC_CONFIG_FILES([
 	Makefile
 	ovirt-image-uploader.spec
 	src/Makefile
+	src/logrotate.d/Makefile
 	src/ovf/Makefile
 	intl/Makefile
 	po/Makefile.in
