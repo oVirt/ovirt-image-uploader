@@ -383,11 +383,9 @@ class ImageUploader(object):
         else:
             raise Exception(_("A valid command was not specified."))
 
-
-
     def _initialize_api(self):
         """
-        Make a RESTful request to the supplied oVirt method.
+        Make a RESTful request to the supplied oVirt Engine method.
         """
         if not self.configuration:
             raise Exception("No configuration.")
@@ -395,40 +393,83 @@ class ImageUploader(object):
         if self.api is None:
             # The API has not been initialized yet.
             try:
-                self.configuration.prompt("engine", msg=_("hostname of oVirt Engine"))
-                self.configuration.prompt("user", msg=_("REST API username for oVirt Engine"))
-                self.configuration.getpass("passwd", msg=_("REST API password for the %s oVirt Engine user") % self.configuration.get("user"))
+                self.configuration.prompt(
+                    "engine",
+                    msg=_("hostname of oVirt Engine")
+                )
+                self.configuration.prompt(
+                    "user",
+                    msg=_("REST API username for oVirt Engine")
+                )
+                self.configuration.getpass(
+                    "passwd",
+                    msg=(
+                        _("REST API password for the %s oVirt Engine user") %
+                        self.configuration.get("user")
+                    )
+                )
             except Configuration.SkipException:
-                raise Exception("Insufficient information provided to communicate with the oVirt Engine REST API.")
+                raise Exception(
+                    "Insufficient information provided to communicate with "
+                    "the oVirt Engine REST API."
+                )
 
             url = "https://" + self.configuration.get("engine") + "/api"
+
             try:
-                self.api = API(url=url,
-                               username=self.configuration.get("user"),
-                               password=self.configuration.get("passwd"),
-                               ca_file=self.configuration.get("cert_file"),
-                               insecure=self.configuration.get("insecure"))
+                # If "insecure" option was provided, use it during API creation
+                self.api = API(
+                    url=url,
+                    username=self.configuration.get("user"),
+                    password=self.configuration.get("passwd"),
+                    ca_file=self.configuration.get("cert_file"),
+                    validate_cert_chain=not self.configuration.get("insecure"),
+                )
 
                 pi = self.api.get_product_info()
                 if pi is not None:
-                    vrm = '%s.%s.%s' % (pi.get_version().get_major(),
-                                        pi.get_version().get_minor(),
-                                        pi.get_version().get_revision())
-                    logging.debug("API Vendor(%s)\tAPI Version(%s)" %  (pi.get_vendor(), vrm))
+                    vrm = '%s.%s.%s' % (
+                        pi.get_version().get_major(),
+                        pi.get_version().get_minor(),
+                        pi.get_version().get_revision()
+                    )
+                    logging.debug(
+                        "API Vendor(%s)\tAPI Version(%s)",
+                        pi.get_vendor(),
+                        vrm
+                    )
                 else:
                     logging.error(_("Unable to connect to REST API."))
                     return False
             except RequestError, re:
-                logging.error(_("Unable to connect to REST API.  Reason: %s") %  re.reason)
+                logging.error(
+                    _("Unable to connect to REST API.  Reason: %s"),
+                    re.reason
+                )
                 return False
             except ConnectionError:
-                logging.error(_("Problem connecting to the REST API.  Is the service available and does the CA certificate exist?"))
+                logging.error(
+                    _(
+                        "Problem connecting to the REST API.  Is the "
+                        "service available and does the CA certificate "
+                        "exist?"
+                    )
+                )
                 return False
             except NoCertificatesError:
-                logging.error(_("Problem connecting to the REST API.  The CA is invalid.  To override use the \'insecure\' option."))
+                logging.error(
+                    _(
+                        "Problem connecting to the REST API.  The CA is "
+                        "invalid.  To override use the \'insecure\' "
+                        "option."
+                    )
+                )
                 return False
             except Exception, e:
-                logging.error(_("Unable to connect to REST API.  Message: %s") %  e)
+                logging.error(
+                    _("Unable to connect to REST API.  Message: %s"),
+                    e
+                )
                 return False
         return True
 
