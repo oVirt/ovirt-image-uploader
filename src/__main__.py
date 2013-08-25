@@ -578,6 +578,21 @@ class ImageUploader(object):
             os.setegid(0)
 
     @staticmethod
+    def get_ovf_dir_space(ovf_directory):
+        size_in_bytes = 0
+        try:
+            for root, dirs, files in os.walk(ovf_directory):
+                for file in files:
+                    tgt = os.path.join(root, file)
+                    if os.path.exists(tgt):
+                        size = os.stat(tgt).st_size
+                        size_in_bytes += os.stat(tgt).st_size
+            return size_in_bytes
+        except:
+            logging.error(_("Unable to calculate the size of folder %s.") % ovf_directory)
+            return -1
+
+    @staticmethod
     def space_test_ovf(ovf_file, dest_dir):
         '''Checks to see if there is enough room to decompress the tgz into dest_dir'''
         tar = tarfile.open(ovf_file, "r:gz")
@@ -1295,34 +1310,39 @@ class ImageUploader(object):
             passwd = getpwnam(NFS_USER)
             dest_dir = os.path.join(mount_dir,remote_path)
             for ovf_file in self.configuration.files:
-                try:
-                    ovf_extract_dir = tempfile.mkdtemp()
-                    logging.debug('local extract directory for OVF is %s' % ovf_extract_dir)
-                    retVal, ovf_file_size = self.space_test_ovf(ovf_file, ovf_extract_dir)
-                    if retVal:
-                        if self.unpack_ovf(ovf_file, ovf_extract_dir):
-                            if (self.update_ovf_xml(ovf_extract_dir)):
-                                self.copy_files_nfs(ovf_extract_dir, dest_dir, address, ovf_file_size, ovf_file)
-                    else:
-                        if ovf_file_size > 0:
-                            ExitCodes.exit_code = ExitCodes.CRITICAL
-                            size_needed_mb = "%1.f" % \
-                                (float(ovf_file_size) / float(pow(2, 20)))
-                            logging.error(_(
-                                "Not enough space in {tempdir}:"
-                                " {size_needed}Mb are needed.").format(
-                                    tempdir=tempfile.gettempdir(),
-                                    size_needed=size_needed_mb
-                                )
-                            )
-
-                finally:
+                if os.path.isdir(ovf_file) == True:
+                    logging.debug('OVF data %s is a directory' % ovf_file)
+                    ovf_file_size = self.get_ovf_dir_space(ovf_file)
+                    if (ovf_file_size != -1 and self.update_ovf_xml(ovf_file)):
+                        self.copy_files_nfs(ovf_file, dest_dir, address, ovf_file_size, ovf_file)
+                else:
                     try:
-                        logging.debug("Cleaning up OVF extract directory %s" % ovf_extract_dir)
-                        shutil.rmtree(ovf_extract_dir)
-                    except Exception, e:
-                        ExitCodes.exit_code=ExitCodes.CLEANUP_ERR
-                        logging.debug(e)
+                        ovf_extract_dir = tempfile.mkdtemp()
+                        logging.debug('local extract directory for OVF is %s' % ovf_extract_dir)
+                        retVal, ovf_file_size = self.space_test_ovf(ovf_file, ovf_extract_dir)
+                        if retVal:
+                            if self.unpack_ovf(ovf_file, ovf_extract_dir):
+                                if (self.update_ovf_xml(ovf_extract_dir)):
+                                    self.copy_files_nfs(ovf_extract_dir, dest_dir, address, ovf_file_size, ovf_file)
+                        else:
+                            if ovf_file_size > 0:
+                                ExitCodes.exit_code = ExitCodes.CRITICAL
+                                size_needed_mb = "%1.f" % \
+                                    (float(ovf_file_size) / float(pow(2, 20)))
+                                logging.error(_(
+                                    "Not enough space in {tempdir}:"
+                                    " {size_needed}Mb are needed.").format(
+                                        tempdir=tempfile.gettempdir(),
+                                        size_needed=size_needed_mb
+                                    )
+                                )
+                    finally:
+                        try:
+                            logging.debug("Cleaning up OVF extract directory %s" % ovf_extract_dir)
+                            shutil.rmtree(ovf_extract_dir)
+                        except Exception, e:
+                            ExitCodes.exit_code=ExitCodes.CLEANUP_ERR
+                            logging.debug(e)
 
         except KeyError, k:
             ExitCodes.exit_code=ExitCodes.CRITICAL
@@ -1353,7 +1373,7 @@ if __name__ == '__main__':
 
     usage_string = _("""
 %prog [options] list
-%prog [options] upload [file]
+%prog [options] upload [file | directory]
 """)
 
     desc = _("""DESCRIPTION
@@ -1361,13 +1381,13 @@ Using  the engine-image-uploader command, you can list export storage domains
 and upload virtual machines in Open Virtualization Format (OVF) to a oVirt
 Engine. The tool only supports OVF files created by oVirt.
 
-OVF archives should have the following characteristics:
+OVF data should have the following characteristics:
 
 * gzip compressed
-        The OVF archive must be created with gzip compression.
+        If using an OVF archive (rather than a directory), it must be created with gzip compression.
 
 * internal layout
-        The archive should contain images and master directories that are in \
+        The OVF data should contain images and master directories that are in \
 the following format:
         |-- images
         |   |-- <Image Group UUID>
