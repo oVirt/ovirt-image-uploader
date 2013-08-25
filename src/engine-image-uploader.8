@@ -5,16 +5,16 @@ engine\-image\-uploader \- import oVirt Open Virtualization Format images
 .SH "SYNOPSIS"
 \fBengine\-image\-uploader\fP [options] list
 .br
-\fBengine\-image\-uploader\fP [options] upload [file]
+\fBengine\-image\-uploader\fP [options] upload [file | directory]
 .SH "DESCRIPTION"
 .PP
 Using the \fBengine\-image\-uploader\fP command, you can list export storage domains and upload virtual machines in Open Virtualization Format (OVF) to a oVirt Engine. The tool only supports OVF files created by oVirt.
 .PP
-OVF archives should have the following characteristics:
+OVF data should have the following characteristics:
 .IP "\fB* gzip compressed\fP"
-The OVF archive must be created with gzip compression.
+If using an OVF archive (rather than a directory), it must be created with gzip compression.
 .IP "\fB* internal layout\fP"
-The archive should contain images and master directories that are in the following format:
+The OVF data should contain images and master directories that are in the following format:
 .br
 |\-\- images
 .br
