@@ -42,6 +42,7 @@ MOUNT='/bin/mount'
 UMOUNT='/bin/umount'
 DEFAULT_CONFIGURATION_FILE='/etc/ovirt-engine/imageuploader.conf'
 
+#{Logging system
 STREAM_LOG_FORMAT = '%(levelname)s: %(message)s'
 FILE_LOG_FORMAT = (
     '%(asctime)s::'
@@ -60,9 +61,18 @@ DEFAULT_LOG_FILE = os.path.join(
     )
 )
 
+
+class NotAnError(logging.Filter):
+
+    def filter(self, entry):
+        return entry.levelno < logging.ERROR
+
+
 def multilog(logger, msg):
-     for line in str(msg).splitlines():
-         logger(line)
+    for line in str(msg).splitlines():
+        logger(line)
+#}
+
 
 def get_from_prompt(msg, default=None, prompter=raw_input):
     try:
@@ -328,10 +338,17 @@ class Configuration(dict):
             logging.error("Could not configure file logging: %s" % e)
 
     def __log_to_stream(self, level):
-        sh = logging.StreamHandler()
         fmt = logging.Formatter(STREAM_LOG_FORMAT)
+        #Errors should always be there, on stderr
+        h_err = logging.StreamHandler(sys.stderr)
+        h_err.setLevel(logging.ERROR)
+        h_err.setFormatter(fmt)
+        logging.root.addHandler(h_err)
+        #Other logs should go to stdout
+        sh = logging.StreamHandler(sys.stdout)
         sh.setLevel(level)
         sh.setFormatter(fmt)
+        sh.addFilter(NotAnError())
         logging.root.addHandler(sh)
 
     def __initLogger(self, logLevel=logging.INFO, quiet=None, logFile=None):
@@ -339,7 +356,6 @@ class Configuration(dict):
         Initialize the logger based on information supplied from the
         command line or configuration file.
         """
-
         # If you call basicConfig more than once without removing handlers
         # it is effectively a noop. In this program it is possible to call
         # __initLogger more than once as we learn information about what
@@ -347,7 +363,7 @@ class Configuration(dict):
         # command line; hence, we will need to load and unload the handlers
         # to ensure consistently fomatted output.
         log = logging.getLogger()
-        for h in log.handlers:
+        for h in list(log.handlers):
             log.removeHandler(h)
 
         if quiet:
@@ -359,16 +375,21 @@ class Configuration(dict):
                 # a file.  We will be *mostly* quiet but not completely.
                 # If there is an exception/error/critical we will print
                 # to stdout/stderr.
-                logging.basicConfig(level=logging.ERROR, format=STREAM_LOG_FORMAT)
+                logging.basicConfig(
+                    level=logging.ERROR,
+                    format=STREAM_LOG_FORMAT
+                )
         else:
             if logFile:
-                # Case: Not quiet and log file supplied.  Log to both file and
-                # stdout/stderr
+                # Case: Not quiet and log file supplied.
+                # Log to both file and stdout/stderr
                 self.__log_to_file(logFile, logLevel)
                 self.__log_to_stream(logLevel)
             else:
-                # Case: Not quiet and no log file supplied.  Log to only stdout/stderr
-                logging.basicConfig(level=logLevel, format=STREAM_LOG_FORMAT)
+                # Case: Not quiet and no log file supplied.
+                # Log to only stdout/stderr
+                self.__log_to_stream(logLevel)
+
 
 class ImageUploader(object):
 
