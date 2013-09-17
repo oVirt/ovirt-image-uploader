@@ -18,3 +18,4 @@ tmp.*
 *.pyo
 *~
 src/config.py
+src/logrotate.d/ovirt-image-uploader

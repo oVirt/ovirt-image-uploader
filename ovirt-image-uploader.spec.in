@@ -46,6 +46,9 @@ Image Uploader tool for oVirt Engine
 	--disable-python-syntax-check
 make %{?_smp_mflags}
 
+%check
+make check
+
 %install
 rm -rf "%{buildroot}"
 make %{?_smp_mflags} install DESTDIR="%{buildroot}"

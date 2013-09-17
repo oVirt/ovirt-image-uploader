@@ -40,9 +40,18 @@ dist_noinst_PYTHON = \
 	ovfenvelopetest.py \
 	$(NULL)
 
-all-local: \
-	python-syntax-check \
-	$(NULL)
+all-local:
+if PYTHON_SYNTAX_CHECK
+	if [ -n "$(PYFLAKES)" ]; then \
+		$(PYFLAKES) ovfenvelopetest.py; \
+	fi
+	if [ -n "$(PEP8)" ]; then \
+		$(PEP8) ovfenvelopetest.py; \
+	fi
+endif
+
+check-local:
+	$(PYTHON) ovfenvelopetest.py
 
 clean-local: \
 	python-clean \
