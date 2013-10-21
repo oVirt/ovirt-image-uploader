@@ -1319,6 +1319,17 @@ class ImageUploader(object):
         elif self.configuration.get('nfs_server'):
             mnt = self.configuration.get('nfs_server')
             (address, sep, path) = mnt.partition(':')
+            base = os.path.basename(path)
+            try:
+                uuid.UUID(base, version=4)
+            except ValueError:
+                raise Exception(
+                    _(
+                        'The specified nfs path is not an export domain: '
+                        'you must include the domain uuid directory in '
+                        'the path.'
+                    )
+                )
         else:
             raise Exception(_("either export-domain or nfs-server must be provided"))
 
@@ -1529,7 +1540,7 @@ which OVF files should be uploaded."""))
             help=_("""the NFS server to which the file(s) should be uploaded.
 This option is an alternative to export-domain and should not be combined with
 export-domain.  Use this when you want to upload files to a specific
-NFS server (e.g.--nfs-server=example.com:/path/to/some/dir)"""),
+NFS server (e.g.--nfs-server=example.com:/path/to/export/<uuid>)"""),
             metavar=_("NFSSERVER"))
 
     export_group.add_option("-i", "--ovf-id", dest="rename_ovf", action="store_false", default=True,
