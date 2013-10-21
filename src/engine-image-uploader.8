@@ -57,7 +57,10 @@ Options in this group specify the export storage domain to which OVF files shoul
 .IP "\fB\-e EXPORT_STORAGE_DOMAIN, \-\-export\-domain=EXPORT_STORAGE_DOMAIN\fP"
 The export storage domain to which the file(s) should be uploaded.\&
 .IP "\fB\-n NFSSERVER, \-\-nfs\-server=NFSSERVER\fP"
-The NFS server to which the file(s) should be uploaded. This option is an alternative to export\-domain and should not be combined with export\-domain. Use this when you want to upload files to a specific NFS server (for example, \-\-nfs\-server=example.com:/path/to/some/dir)\&
+The NFS server to which the file(s) should be uploaded.
+This option is an alternative to export\-domain and should not be combined with export\-domain.
+Use this when you want to upload files to a specific NFS server 
+(for example, \-\-nfs\-server=example.com:/path/to/export/<uuid>)\&
 .IP "\fB\-i, \-\-ovf\-id\fP"
 Use this option if you do not want to update the UUID of the image. By default, the tool will generate a new UUID for the image.  This ensures that there is no conflict between the id of the incoming image and those already in oVirt Engine.\&
 .IP "\fB\-d, \-\-disk\-instance\-id\fP"
@@ -140,9 +143,11 @@ The program encountered a problem un\-mounting and removing the temporary direct
 .nf
 /etc/ovirt\-engine/imageuploader.conf
 .br
-/var/log/engine\-image\-uploader.log
+/var/log/ovirt\-engine/ovirt\-image\-uploader/*.log
 .fi
 .SH "AUTHORS"
 Keith Robertson
 .nf
 Chris Negus
+.nf
+Sandro Bonazzola
