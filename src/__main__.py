@@ -226,15 +226,6 @@ class Configuration(dict):
                     'engine',
                     cp.get('ImageUploader', 'rhevm')
                 )
-                logging.warning(
-                    _(
-                        'A deprecated configuration key has been found. '
-                        'Please replace the deprecated key, \'rhevm\', '
-                        'with the new one \'engine\' in {configFiles}'
-                    ).format(
-                        configFiles=filename
-                    )
-                )
             cp.remove_option('ImageUploader', 'rhevm')
 
         # we want the items from the ImageUploader section only
