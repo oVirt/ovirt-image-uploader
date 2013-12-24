@@ -256,6 +256,14 @@ class Configuration(dict):
                     cp.get('ImageUploader', 'rhevm')
                 )
             cp.remove_option('ImageUploader', 'rhevm')
+        if cp.has_option('ImageUploader', 'engine-ca'):
+            if not cp.has_option('ImageUploader', 'cert-file'):
+                cp.set(
+                    'ImageUploader',
+                    'cert-file',
+                    cp.get('ImageUploader', 'engine-ca')
+                )
+            cp.remove_option('ImageUploader', 'engine-ca')
 
         # we want the items from the ImageUploader section only
         try:
