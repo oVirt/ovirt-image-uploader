@@ -53,9 +53,6 @@ dist_engineconfig_DATA = \
 	$(NULL)
 
 confddir=$(engineconfigdir)/imageuploader.conf.d
-dist_confd_DATA =\
-	.keep \
-	$(NULL)
 
 config.py: config.py.in
 	$(SED) \
@@ -71,8 +68,10 @@ clean-local: \
 	$(NULL)
 
 install-data-hook:
+	$(MKDIR_P) "$(DESTDIR)$(confddir)"
 	$(MKDIR_P) "$(DESTDIR)$(bindir)"
 	$(MKDIR_P) "$(DESTDIR)$(localstatedir)/log/ovirt-engine/$(PACKAGE_NAME)"
+	chmod 640 "$(DESTDIR)$(engineconfigdir)/imageuploader.conf"
 	chmod a+x "$(DESTDIR)$(ovirtimageuploaderlibdir)/__main__.py"
 	rm -f "$(DESTDIR)$(bindir)/engine-image-uploader"
 	$(LN_S) "$(ovirtimageuploaderlibdir)/__main__.py" "$(DESTDIR)$(bindir)/engine-image-uploader"

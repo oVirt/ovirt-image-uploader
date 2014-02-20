@@ -46,6 +46,7 @@ Image Uploader tool for oVirt Engine
 %configure \
 	--docdir="%{_docdir}/%{package_name}-%{version}" \
 	--disable-python-syntax-check
+
 make %{?_smp_mflags}
 
 %check
@@ -59,9 +60,9 @@ make %{?_smp_mflags} install DESTDIR="%{buildroot}"
 %doc AUTHORS
 %doc COPYING
 %dir %{_localstatedir}/log/ovirt-engine/%{package_name}
-%config(noreplace) %{_sysconfdir}/ovirt-engine/imageuploader.conf
+%dir %{_sysconfdir}/ovirt-engine/imageuploader.conf.d
+ %attr(0640, -, -) %config(noreplace) %{_sysconfdir}/ovirt-engine/imageuploader.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{package_name}
-%{_sysconfdir}/ovirt-engine/imageuploader.conf.d/.keep
 %{python_sitelib}/ovirt_image_uploader/*.py*
 %{python_sitelib}/ovirt_image_uploader/ovf/*.py*
 %{_bindir}/engine-image-uploader
