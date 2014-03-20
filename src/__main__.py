@@ -2,32 +2,23 @@
 
 import sys
 import os
-import glob
 from optparse import OptionParser, OptionGroup, SUPPRESS_HELP
 import subprocess
 import shlex
 import logging
-import locale
 import gettext
-import pprint
-import urllib
-import urllib2
-import base64
 import traceback
 import tempfile
 import shutil
 import fnmatch
 import uuid
 import re
-from pwd import getpwnam
 import getpass
 import tarfile
 import time
 from lxml import etree
 from ovf import ovfenvelope
-from ovf.ovfenvelope import *
 from ovirtsdk.api import API
-from ovirtsdk.xml import params
 from ovirtsdk.infrastructure.errors import RequestError, ConnectionError, NoCertificatesError
 
 from ovirt_image_uploader import config
@@ -461,10 +452,10 @@ class ImageUploader(object):
                 else:
                     logging.error(_("Unable to connect to REST API."))
                     return False
-            except RequestError, re:
+            except RequestError, re_e:
                 logging.error(
                     _("Unable to connect to REST API.  Reason: %s"),
-                    re.reason
+                    re_e.reason
                 )
                 return False
             except ConnectionError:
@@ -591,7 +582,7 @@ class ImageUploader(object):
             os.setegid(gid)
             os.seteuid(uid)
             return os.path.exists(file)
-        except Exception, e:
+        except Exception:
             raise Exception("unable to test the available space on %s" % dir)
         finally:
             os.seteuid(0)
@@ -606,7 +597,7 @@ class ImageUploader(object):
                     tgt = os.path.join(root, file)
                     if os.path.exists(tgt):
                         size = os.stat(tgt).st_size
-                        size_in_bytes += os.stat(tgt).st_size
+                        size_in_bytes += size
             return size_in_bytes
         except:
             logging.error(_("Unable to calculate the size of folder %s.") % ovf_directory)
@@ -647,7 +638,7 @@ class ImageUploader(object):
             os.setegid(gid)
             os.seteuid(uid)
             dir_stat = os.statvfs(remote_dir)
-        except Exception, e:
+        except Exception:
             raise Exception("unable to test the available space on %s" % remote_dir)
         finally:
             os.seteuid(0)
@@ -1120,11 +1111,9 @@ class ImageUploader(object):
                         itemElement = sec.findall('Item')
                         for item in itemElement:
                             logging.debug("item tag(%s) item text(%s) item attr(%s) class(%s)" % (item.tag, item.text,item.attrib, item))
-                            resource_type = None
                             for elem in item:
                                 logging.debug("tag(%s) value(%s)" % (elem.tag, elem.text))
                                 if str(elem.tag).endswith('ResourceType') and elem.text == '10':
-                                    resource_type = elem.text
                                     item.getparent().remove(item)
                                     write = True
 
@@ -1232,7 +1221,6 @@ class ImageUploader(object):
             return
 
         # Check for pre-existing files.  We can't just overwrite what is already there.
-        existing_files = False
         for root, dirs, files in os.walk(source_dir, topdown=True):
             for name in files:
                 for paths in files_to_copy:
@@ -1262,7 +1250,6 @@ class ImageUploader(object):
 
         # Copy the files with the .ovf being last because we don't want oVirt to find anything until
         # it is all there.
-        local_ovf_file = None
         remote_ovf_file = None
         for root, dirs, files in os.walk(source_dir, topdown=True):
             for name in files:
@@ -1338,7 +1325,6 @@ class ImageUploader(object):
         cmd = self.format_nfs_command(address, path, mount_dir)
         try:
             self.caller.call(cmd)
-            passwd = getpwnam(NFS_USER)
             dest_dir = os.path.join(mount_dir,remote_path)
             for ovf_file in self.configuration.files:
                 if os.path.isdir(ovf_file) == True:
@@ -1375,7 +1361,7 @@ class ImageUploader(object):
                             ExitCodes.exit_code=ExitCodes.CLEANUP_ERR
                             logging.debug(e)
 
-        except KeyError, k:
+        except KeyError:
             ExitCodes.exit_code=ExitCodes.CRITICAL
             logging.error(_("A user named %s with a UID and GID of %d must be defined on the system to mount the export storage domain on %s as Read/Write"
                             % (NFS_USER,
