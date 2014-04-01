@@ -901,6 +901,183 @@ class ImageUploader(object):
                    logging.error("Section/Disk/parentRef element. Message: %s" % e)
                    return False
 
+    def __chek_if_disk(self, item):
+        """
+        Iterate through the child elements of an info and ensure
+        that it has all of the requisite elements that describe
+        a disk.
+        """
+        instance_id_tag = None
+        host_resource_tag = None
+        resource_type = None
+        for elem in item:
+            if str(elem.tag).endswith('ResourceType') and elem.text == '17':
+                resource_type = elem.text
+            elif str(elem.tag).endswith('HostResource'):
+                host_resource_tag = elem.tag
+            elif str(elem.tag).endswith('InstanceId'):
+                instance_id_tag = elem.tag
+        return host_resource_tag, instance_id_tag, resource_type
+
+    def __remap_id(self, n_id_d, host_resource_tag, image_group_id_dict,
+                   image_id_dict, instance_id_tag, item, tree):
+        """
+        At this point we know that the Content element has a
+        "disk" Item.  We need go generate new UUIDs for it and
+        reset them everywhere else they're located in the doc. Ugh.
+        """
+
+        old_image_id = None
+        old_combined_group_id = None
+        n_id_d['new_image_id'] = str(uuid.uuid4())
+        n_id_d['new_image_group_id'] = str(uuid.uuid4())
+        n_id_d['combined_ids'] = "%s/%s" % (n_id_d['new_image_group_id'],
+                                            n_id_d['new_image_id'])
+        logging.debug("New image id(%s) new image group id(%s)" % (
+        n_id_d['new_image_id'], n_id_d['combined_ids']))
+        tmp = item.find(instance_id_tag)
+        old_image_id = tmp.text
+        tmp.text = n_id_d['new_image_id']
+        tmp = item.find(host_resource_tag)
+        old_combined_group_id = tmp.text
+        # Safety
+        if old_image_id is None or old_combined_group_id is None:
+            logging.error(
+                "The Content/Section:VirtualHardwareSection_Type element "
+                "contains a null InstanceId or HostResource")
+            return False, old_image_id
+        old_image_group_id = os.path.dirname(old_combined_group_id)
+        logging.debug("old group id (%s) proposed new group id (%s)" % (
+        old_image_group_id, n_id_d['new_image_group_id']))
+        if old_image_group_id in image_group_id_dict:
+            logging.debug(
+                "the old image group id (%s) has already been given a new "
+                "image group id(%s)" %
+                (old_image_group_id, image_group_id_dict[old_image_group_id]))
+            n_id_d['new_image_group_id'] = \
+                image_group_id_dict[old_image_group_id]
+            n_id_d['combined_ids'] = "%s/%s" % (n_id_d['new_image_group_id'],
+                                                n_id_d['new_image_id'])
+        else:
+            # Save the new image group ID in a dict so that we can check
+            # other disks to see if
+            # they're members of this *old* image group.
+            image_group_id_dict[old_image_group_id] = \
+                n_id_d['new_image_group_id']
+        # Set the image group
+        tmp.text = n_id_d['combined_ids']
+        logging.debug("old image id(%s) old image group id(%s)" % (
+        old_image_id, old_combined_group_id))
+        # We need to store a mapping of the old image ID to new image ID
+        # so that we can update the .meta file.
+        image_id_dict[old_image_id] = n_id_d['new_image_id']
+        # Update the References section to point to the new disk UUID
+        ref_iterator = tree.findall('References')
+        for reference in ref_iterator:
+            logging.debug(
+                "References tag(%s) References text(%s) References attr(%s) "
+                "class(%s)" %
+                (reference.tag, reference.text, reference.attrib, reference))
+            for file in reference:
+                id_attr = None
+                href_attr = None
+                logging.debug(
+                    "File tag(%s) File text(%s) File attr(%s) class(%s)" %
+                    (file.tag, file.text, file.attrib, file))
+                for attr in file.attrib:
+                    if str(attr).endswith('id') and file.attrib[
+                        attr] == old_image_id:
+                        id_attr = attr
+                    elif str(attr).endswith('href'):
+                        href_attr = attr
+                if id_attr and href_attr:
+                    logging.debug("Setting %s and %s to %s and %s" %
+                                  (id_attr, href_attr, n_id_d['new_image_id'],
+                                   n_id_d['combined_ids']))
+                    file.attrib[id_attr] = n_id_d['new_image_id']
+                    file.attrib[href_attr] = n_id_d['combined_ids']
+
+        # Update the Section xsi:type="ovf:DiskSection_Type"
+        iterator = tree.findall('Section')
+        for sec in iterator:
+            for attr in sec.attrib:
+                if str(sec.attrib[attr]).endswith('DiskSection_Type'):
+                    for elem in sec:
+                        disk_id = None
+                        file_ref = None
+                        parent_ref = None
+                        logging.debug("tag(%s) text(%s) attr(%s) class(%s)" %
+                                      (elem.tag, elem.text, elem.attrib, elem))
+                        for attr in elem.attrib:
+                            if str(attr).endswith('diskId') and elem.attrib[
+                                attr] == old_image_id:
+                                disk_id = attr
+                            if str(attr).endswith('fileRef'):
+                                file_ref = attr
+                            if str(attr).endswith('parentRef') and str(
+                                    elem.attrib[attr]).strip() != '':
+                                parent_ref = attr
+
+                        # Update the disk ID and fileRef if we found a match
+                        logging.debug("tag(%s) text(%s) attr(%s) class(%s)" %
+                                      (elem.tag, elem.text, elem.attrib, elem))
+                        if disk_id and file_ref:
+                            if parent_ref and (
+                                elem.attrib[file_ref] == elem.attrib[
+                                parent_ref]):
+                                # It is odd that the parent_ref is the same
+                                # for N-1 disks.  Should be
+                                # tree-ish, IMHO.
+                                logging.debug(
+                                    "Found the parent snap. file_ref(%s) "
+                                    "parent_ref(%s)" %
+                                    (elem.attrib[file_ref],
+                                     elem.attrib[parent_ref]))
+                                n_id_d['parent_combined_id'] = \
+                                    n_id_d['combined_ids']
+                            elem.attrib[disk_id] = n_id_d['new_image_id']
+                            elem.attrib[file_ref] = n_id_d['combined_ids']
+        return True, old_image_id
+
+    def __rewrite_ovf(self, n_id_d,
+                      old_image_id, ovf_file, source_dir, tree):
+        if self.write_ovf_file(ovf_file, tree):
+            # Rename the image
+            old_image_file = self.find_file(
+                source_dir, old_image_id)
+            old_image_file = os.path.join(source_dir,
+                                          old_image_file)
+            old_image_dir = os.path.dirname(
+                old_image_file)
+            logging.debug("Image file(%s) Image dir(%s)" % (
+            old_image_file, old_image_dir))
+            new_image_name = os.path.join(old_image_dir,
+                                          n_id_d['new_image_id']
+            )
+            logging.debug(
+                'old file(%s) new file(%s)' % (old_image_file, new_image_name))
+            os.rename(old_image_file, new_image_name)
+
+            # Update the meta file
+            if not self.update_meta_file(
+                source_dir,
+                old_image_id,
+                n_id_d['new_image_id'],
+                n_id_d['new_image_group_id']
+            ):
+                return False
+
+            # Rename the image's dir (i.e. group ID dir)
+            new_dir_name = os.path.join(os.path.dirname(old_image_dir),
+                                        os.path.dirname(n_id_d['combined_ids'])
+            )
+            logging.debug(
+                'old dir(%s) new dir(%s)' % (old_image_dir, new_dir_name))
+            os.rename(old_image_dir, new_dir_name)
+            return True
+        else:
+            return False
+
     def update_disk_id(self, ovf_file, source_dir, tree):
         '''
         Search the Content element in the OVF XML and look for disks.
@@ -919,139 +1096,49 @@ class ImageUploader(object):
                         logging.debug("tag(%s) text(%s) attr(%s) class(%s)" % (sec.tag, sec.text,sec.attrib, sec))
                         itemElement = sec.findall('Item')
                         for item in itemElement:
-                            logging.debug("item tag(%s) item text(%s) item attr(%s) class(%s)" % (item.tag, item.text,item.attrib, item))
+                            logging.debug(
+                                "item tag(%s) item text(%s) item attr(%s) "
+                                "class(%s)" %
+                                (item.tag, item.text, item.attrib, item)
+                            )
                             instance_id_tag = None
                             host_resource_tag = None
                             resource_type = None
-                            for elem in item:
-                                # Iterate through the child elements of an info and ensure
-                                # that it has all of the requisite elements that describe
-                                # a disk.
-                                if str(elem.tag).endswith('ResourceType') and elem.text == '17':
-                                    resource_type = elem.text
-                                elif str(elem.tag).endswith('HostResource'):
-                                    host_resource_tag = elem.tag
-                                elif str(elem.tag).endswith('InstanceId'):
-                                    instance_id_tag = elem.tag
+                            host_resource_tag, instance_id_tag, \
+                                resource_type = self.__chek_if_disk(item)
 
-                            if instance_id_tag and host_resource_tag and resource_type:
-                                # At this point we know that the Content element has a
-                                # "disk" Item.  We need go generate new UUIDs for it and
-                                # reset them everywhere else they're located in the doc. Ugh.
-                                old_image_id = None
-                                old_combined_group_id = None
-                                new_image_id = str(uuid.uuid4())
-                                new_image_group_id = str(uuid.uuid4())
-                                combined_ids = "%s/%s" % (new_image_group_id, new_image_id)
-                                logging.debug("New image id(%s) new image group id(%s)" % (new_image_id, combined_ids))
+                            if instance_id_tag and host_resource_tag and \
+                                    resource_type:
+                                n_id_d = {
+                                    'combined_ids': None,
+                                    'new_image_group_id': None,
+                                    'new_image_id': None,
+                                    'parent_combined_id':
+                                        parent_combined_id
+                                }
 
-                                tmp = item.find(instance_id_tag)
-                                old_image_id = tmp.text
-                                tmp.text = new_image_id
-                                tmp = item.find(host_resource_tag)
-                                old_combined_group_id = tmp.text
-                                # Safety
-                                if old_image_id is None or old_combined_group_id is None:
-                                    logging.error("The Content/Section:VirtualHardwareSection_Type element contains a null InstanceId or HostResource")
+                                ms, old_image_id = self.__remap_id(
+                                    n_id_d,
+                                    host_resource_tag,
+                                    image_group_id_dict,
+                                    image_id_dict,
+                                    instance_id_tag,
+                                    item,
+                                    tree
+                                )
+
+                                if not ms:
                                     return False
 
-                                old_image_group_id = os.path.dirname(old_combined_group_id)
-                                logging.debug("old group id (%s) proposed new group id (%s)" % (old_image_group_id,new_image_group_id))
-                                if image_group_id_dict.has_key(old_image_group_id):
-                                    logging.debug("the old image group id (%s) has already been given a new image group id(%s)" %
-                                                  (old_image_group_id, image_group_id_dict[old_image_group_id]))
-                                    new_image_group_id = image_group_id_dict[old_image_group_id]
-                                    combined_ids = "%s/%s" % (new_image_group_id, new_image_id)
-                                else:
-                                    # Save the new image group ID in a dict so that we can check other disks to see if
-                                    # they're members of this *old* image group.
-                                    image_group_id_dict[old_image_group_id] = new_image_group_id
-                                # Set the image group
-                                tmp.text = combined_ids
-                                logging.debug("old image id(%s) old image group id(%s)" % (old_image_id, old_combined_group_id))
-
-                                # We need to store a mapping of the old image ID to new image ID so that
-                                # we can update the .meta file.
-                                image_id_dict[old_image_id] = new_image_id
-
-
-
-
-                                # Update the References section to point to the new disk UUID
-                                ref_iterator = tree.findall('References')
-                                for reference in ref_iterator:
-                                    logging.debug("References tag(%s) References text(%s) References attr(%s) class(%s)" %
-                                                  (reference.tag, reference.text,reference.attrib, reference))
-                                    for file in reference:
-                                        id_attr = None
-                                        href_attr = None
-                                        logging.debug("File tag(%s) File text(%s) File attr(%s) class(%s)" %
-                                                      (file.tag, file.text,file.attrib, file))
-                                        for attr in file.attrib:
-                                            if str(attr).endswith('id') and file.attrib[attr] == old_image_id:
-                                                id_attr = attr
-                                            elif str(attr).endswith('href'):
-                                                href_attr = attr
-                                        if id_attr and href_attr:
-                                            logging.debug("Setting %s and %s to %s and %s" %
-                                                          (id_attr,href_attr, new_image_id, combined_ids))
-                                            file.attrib[id_attr] = new_image_id
-                                            file.attrib[href_attr] = combined_ids
-
-                                # Update the Section xsi:type="ovf:DiskSection_Type"
-                                iterator = tree.findall('Section')
-                                for sec in iterator:
-                                    for attr in sec.attrib:
-                                        if str(sec.attrib[attr]).endswith('DiskSection_Type'):
-                                            for elem in sec:
-                                                disk_id = None
-                                                file_ref = None
-                                                parent_ref = None
-                                                logging.debug("tag(%s) text(%s) attr(%s) class(%s)" %
-                                                              (elem.tag, elem.text,elem.attrib, elem))
-                                                for attr in elem.attrib:
-                                                    if str(attr).endswith('diskId') and elem.attrib[attr] == old_image_id:
-                                                        disk_id = attr
-                                                    if str(attr).endswith('fileRef'):
-                                                        file_ref = attr
-                                                    if str(attr).endswith('parentRef') and str(elem.attrib[attr]).strip() != '':
-                                                        parent_ref = attr
-
-                                                # Update the disk ID and fileRef if we found a match
-                                                logging.debug("tag(%s) text(%s) attr(%s) class(%s)" %
-                                                              (elem.tag, elem.text,elem.attrib, elem))
-                                                if disk_id and file_ref:
-                                                    if parent_ref and (elem.attrib[file_ref] == elem.attrib[parent_ref]):
-                                                        # It is odd that the parent_ref is the same for N-1 disks.  Should be
-                                                        # tree-ish, IMHO.
-                                                        logging.debug("Found the parent snap. file_ref(%s) parent_ref(%s)" %
-                                                                      (elem.attrib[file_ref], elem.attrib[parent_ref]))
-                                                        parent_combined_id = combined_ids
-                                                    elem.attrib[disk_id] = new_image_id
-                                                    elem.attrib[file_ref] = combined_ids
-
-
-
-                                # Write the updated XML back out and update meta file
-                                if self.write_ovf_file(ovf_file, tree):
-                                    # Rename the image
-                                    old_image_file = self.find_file(source_dir, old_image_id)
-                                    old_image_file = os.path.join(source_dir,old_image_file)
-                                    old_image_dir = os.path.dirname(old_image_file)
-                                    logging.debug("Image file(%s) Image dir(%s)" % (old_image_file,old_image_dir))
-                                    new_image_name = os.path.join(old_image_dir, new_image_id)
-                                    logging.debug('old file(%s) new file(%s)' % (old_image_file, new_image_name))
-                                    os.rename(old_image_file, new_image_name)
-
-                                    # Update the meta file
-                                    if not self.update_meta_file(source_dir, old_image_id, new_image_id, new_image_group_id):
-                                        return False
-
-                                    # Rename the image's dir (i.e. group ID dir)
-                                    new_dir_name = os.path.join(os.path.dirname(old_image_dir), os.path.dirname(combined_ids))
-                                    logging.debug('old dir(%s) new dir(%s)' % (old_image_dir, new_dir_name))
-                                    os.rename(old_image_dir, new_dir_name)
-                                else:
+                                # Write the updated XML back out and update
+                                # meta file
+                                if not self.__rewrite_ovf(
+                                    n_id_d,
+                                    old_image_id,
+                                    ovf_file,
+                                    source_dir,
+                                    tree
+                                ):
                                     return False
 
             # At this point we should have a mapping of old image_ids to new
