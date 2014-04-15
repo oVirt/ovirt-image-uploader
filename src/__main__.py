@@ -2044,26 +2044,8 @@ temporary directory.
             "path to configuration file (default=%s)"
             % DEFAULT_CONFIGURATION_FILE
         ),
-        metavar=_("PATH")
-    )
-
-    parser.add_option(
-        "",
-        "--cert-file",
-        dest="cert_file",
-        help="The CA certificate used to validate the engine"
-             " (default=/etc/pki/ovirt-engine/ca.pem).",
-        metavar="/etc/pki/ovirt-engine/ca.pem",
-        default="/etc/pki/ovirt-engine/ca.pem"
-    )
-
-    parser.add_option(
-        "",
-        "--insecure",
-        dest="insecure",
-        help="Do not make an attempt to verify the engine.",
-        action="store_true",
-        default=False
+        metavar=_("PATH"),
+        default=DEFAULT_CONFIGURATION_FILE
     )
 
     parser.add_option(
@@ -2125,6 +2107,25 @@ temporary directory.
             """hostname or IP address of the oVirt Engine
             (default=localhost:443)."""),
         default="localhost:443"
+    )
+
+    engine_group.add_option(
+        "",
+        "--cert-file",
+        dest="cert_file",
+        help="The CA certificate used to validate engine identity"
+             " (default=/etc/pki/ovirt-engine/ca.pem).",
+        metavar=_("PATH"),
+        default="/etc/pki/ovirt-engine/ca.pem"
+    )
+
+    engine_group.add_option(
+        "",
+        "--insecure",
+        dest="insecure",
+        help="Do not make an attempt to verify the engine identity.",
+        action="store_true",
+        default=False
     )
 
     export_group = OptionGroup(
