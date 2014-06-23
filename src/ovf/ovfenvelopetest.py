@@ -1,6 +1,7 @@
 '''
 Created on May 17, 2011
 '''
+import os
 import unittest
 import ovfenvelope
 import pprint
@@ -10,7 +11,12 @@ import sys
 class Test(unittest.TestCase):
 
     def setUp(self):
-        self.xmlDoc = ovfenvelope.parse("sample-ovf.xml")
+        self.xmlDoc = ovfenvelope.parse(
+            os.path.join(
+                os.path.dirname(__file__),
+                "sample-ovf.xml"
+            )
+        )
         self.section_ary = self.xmlDoc.get_Section()
         self.content_ary = self.xmlDoc.get_Content()
         self.ref_ary = self.xmlDoc.get_References()

@@ -43,15 +43,15 @@ dist_noinst_PYTHON = \
 all-local:
 if PYTHON_SYNTAX_CHECK
 	if [ -n "$(PYFLAKES)" ]; then \
-		$(PYFLAKES) ovfenvelopetest.py; \
+		$(PYFLAKES) $(srcdir)/ovfenvelopetest.py; \
 	fi
 	if [ -n "$(PEP8)" ]; then \
-		$(PEP8) ovfenvelopetest.py; \
+		$(PEP8) $(srcdir)/ovfenvelopetest.py; \
 	fi
 endif
 
 check-local:
-	$(PYTHON) ovfenvelopetest.py
+	$(PYTHON) $(srcdir)/ovfenvelopetest.py
 
 clean-local: \
 	python-clean \
