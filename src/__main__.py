@@ -623,21 +623,26 @@ class ImageUploader(object):
         dest_dir.
         """
         retVal = True
+        # We are using system tar instead of tarfile module
+        # cause python tarfile module doesn't handle really well
+        # with sparse files like thin provisioned disk images
         try:
-            tar = tarfile.open(ovf_file, "r:gz")
-            tar.extractall(dest_dir)
-        except Exception, e:
+            with open(os.devnull, "w") as n:
+                subprocess.check_call(
+                    ['tar', '-xzf', ovf_file, '-C', dest_dir],
+                    stdout=n,
+                    stderr=n,
+                )
+        except subprocess.CalledProcessError as ex:
             retVal = False
             logging.error(
                 _(
                     "Problem unpacking %s.  Message %s" % (
                         ovf_file,
-                        str(e).strip()
+                        str(ex).strip()
                     )
                 )
             )
-        finally:
-            tar.close()
         return retVal
 
     def format_nfs_command(self, address, export, dir):
@@ -759,6 +764,30 @@ class ImageUploader(object):
         else:
             return (False, dir_size)
 
+    def copyfileobj_sparse(
+            self,
+            fsrc,
+            fdst,
+            length=16*1024,
+            make_sparse=True
+    ):
+        """
+        copy data from file-like object fsrc to file-like object fdst
+        like shutils.copyfileobj does but supporting also
+        sparse file
+        """
+        while 1:
+            buf = fsrc.read(length)
+            if not buf:
+                break
+            if make_sparse and buf == '\0'*len(buf):
+                fdst.seek(len(buf), os.SEEK_CUR)
+            else:
+                fdst.write(buf)
+        if make_sparse:
+            # Make sure the file ends where it should, even if padded out.
+            fdst.truncate()
+
     def copy_file_nfs(self, src_file_name, dest_file_name, uid, gid):
         """
         Copy a file from source to dest via file handles.  The destination
@@ -775,7 +804,7 @@ class ImageUploader(object):
             os.setegid(gid)
             os.seteuid(uid)
             dest = open(dest_file_name, 'w')
-            shutil.copyfileobj(src, dest)
+            self.copyfileobj_sparse(src, dest)
         except Exception, e:
             retVal = False
             logging.error(
@@ -1706,25 +1735,26 @@ class ImageUploader(object):
                                 )
 
         # Is there enough room for what we want to copy now?
-        retVal, remote_dir_size = self.space_test_nfs(
-            remote_dir,
-            ovf_size,
-            NUMERIC_VDSM_ID,
-            NUMERIC_VDSM_ID
-        )
-        if not retVal:
-            logging.error(
-                _(
-                    'There is not enough space in %s (%s bytes) '
-                    'for the contents of %s (%s bytes)'
-                ) % (
-                    address,
-                    remote_dir_size,
-                    ovf_file_name,
-                    ovf_size
-                )
+        if ovf_size > 0:
+            retVal, remote_dir_size = self.space_test_nfs(
+                remote_dir,
+                ovf_size,
+                NUMERIC_VDSM_ID,
+                NUMERIC_VDSM_ID
             )
-            return
+            if not retVal:
+                logging.error(
+                    _(
+                        'There is not enough space in %s (%s bytes) '
+                        'for the contents of %s (%s bytes)'
+                    ) % (
+                        address,
+                        remote_dir_size,
+                        ovf_file_name,
+                        ovf_size
+                    )
+                )
+                return
 
         # Make the remote directories
         for valid_files in files_to_copy:
@@ -1867,11 +1897,15 @@ class ImageUploader(object):
                             'local extract directory for OVF is %s'
                             % ovf_extract_dir
                         )
-                        retVal, ovf_file_size = \
-                            self.space_test_ovf(
-                                ovf_file,
-                                ovf_extract_dir
-                            )
+                        if conf.get('ignorelsc'):
+                            retVal = True
+                            ovf_file_size = -1
+                        else:
+                            retVal, ovf_file_size = \
+                                self.space_test_ovf(
+                                    ovf_file,
+                                    ovf_extract_dir
+                                )
                         if retVal:
                             if self.unpack_ovf(ovf_file, ovf_extract_dir):
                                 if (self.update_ovf_xml(ovf_extract_dir)):
@@ -1890,7 +1924,13 @@ class ImageUploader(object):
                                 logging.error(
                                     _(
                                         "Not enough space in {tempdir}:"
-                                        " {size_needed}Mb are needed."
+                                        " up to {size_needed}Mb are needed.\n"
+                                        "Either free it up, specify another "
+                                        "dir with TMPDIR env variable "
+                                        "or supply the --ignore-lsc option \n"
+                                        "to ignore this error if you are sure "
+                                        "that the free space is enough "
+                                        "to decompress the image."
                                     ).format(
                                         tempdir=tempfile.gettempdir(),
                                         size_needed=size_needed_mb
@@ -2063,6 +2103,20 @@ temporary directory.
         help=_(
             "replace like named files on the target file "
             "server (default=off)"
+        ),
+        action="store_true",
+        default=False
+    )
+
+    parser.add_option(
+        "",
+        "--ignore-lsc",
+        dest="ignorelsc",
+        help=_(
+            "ignore free space errors on local  "
+            "{tempdir} filesystem, useful with sparse files (default=off)"
+        ).format(
+            tempdir=tempfile.gettempdir(),
         ),
         action="store_true",
         default=False
