@@ -17,6 +17,9 @@
 
 %global		package_version @PACKAGE_VERSION@
 %global		package_name @PACKAGE_NAME@
+# Required users and groups
+%global		vdsm_user @VDSMUSER@
+%global		vdsm_group @VDSMGROUP@
 
 Summary:	Image Uploader for oVirt Engine
 Name:		%{package_name}
@@ -30,6 +33,7 @@ BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}
 BuildArch:	noarch
 Requires:	python
 Requires:	python-lxml
+Requires(pre):	shadow-utils
 Requires:	ovirt-engine-sdk-python >= 3.5.0.2
 Requires:	logrotate
 BuildRequires:	gettext
@@ -51,6 +55,11 @@ make %{?_smp_mflags}
 
 %check
 make check
+
+%pre
+getent passwd %{vdsm_user} >/dev/null || \
+	LC_ALL=C useradd -r -u 36 -g %{vdsm_group} -d / \
+		-s /sbin/nologin -c "Node Virtualization Manager" %{vdsm_user}
 
 %install
 rm -rf "%{buildroot}"
