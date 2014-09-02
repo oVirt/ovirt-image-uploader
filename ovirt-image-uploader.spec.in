@@ -57,6 +57,8 @@ make %{?_smp_mflags}
 make check
 
 %pre
+getent group %{vdsm_group} >/dev/null || \
+	LC_ALL=C groupadd -g 36 -r %{vdsm_group}
 getent passwd %{vdsm_user} >/dev/null || \
 	LC_ALL=C useradd -r -u 36 -g %{vdsm_group} -d / \
 		-s /sbin/nologin -c "Node Virtualization Manager" %{vdsm_user}
