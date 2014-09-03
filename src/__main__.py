@@ -438,13 +438,20 @@ class ImageUploader(object):
 
             try:
                 # If "insecure" option was provided, use it during API creation
-                self.api = API(
-                    url=url,
-                    username=self.configuration.get("user"),
-                    password=self.configuration.get("passwd"),
-                    ca_file=self.configuration.get("cert_file"),
-                    insecure=self.configuration.get("insecure"),
-                )
+                if self.configuration.get("insecure"):
+                    self.api = API(
+                        url=url,
+                        username=self.configuration.get("user"),
+                        password=self.configuration.get("passwd"),
+                        insecure=True,
+                    )
+                else:
+                    self.api = API(
+                        url=url,
+                        username=self.configuration.get("user"),
+                        password=self.configuration.get("passwd"),
+                        ca_file=self.configuration.get("cert_file"),
+                    )
 
                 pi = self.api.get_product_info()
                 if pi is not None:
@@ -501,7 +508,7 @@ class ImageUploader(object):
             return ary[0]
 
         if not self._initialize_api():
-            return
+            sys.exit(ExitCodes.CRITICAL)
 
         dcAry = self.api.datacenters.list()
         if dcAry is not None:
@@ -544,7 +551,7 @@ class ImageUploader(object):
           (host, id, path)
         """
         if not self._initialize_api():
-            return
+            sys.exit(ExitCodes.CRITICAL)
         sd = self.api.storagedomains.get(exportdomain)
         if sd is not None:
             if sd.get_type() != 'export':
