@@ -14,7 +14,6 @@ import fnmatch
 import uuid
 import re
 import getpass
-import tarfile
 import time
 from lxml import etree
 from ovf import ovfenvelope
@@ -716,21 +715,31 @@ class ImageUploader(object):
         Checks to see if there is enough room to decompress the tgz into
         dest_dir
         """
-        tar = tarfile.open(ovf_file, "r:gz")
         size_in_bytes = 0
-        try:
-            for tarinfo in tar:
-                if tarinfo.isreg():
-                    size_in_bytes += tarinfo.size
-        except:
+        exttar = subprocess.Popen(
+            ['tar', '-tvzf', ovf_file],
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        outerr = exttar.communicate()
+        if outerr[1] != '':
             logging.error(
                 _(
                     "Unable to calculate the decompressed size of %s."
                 ) % ovf_file
             )
-            return (False, -1)
-        finally:
-            tar.close()
+            return False, -1
+        for line in outerr[0].splitlines():
+            try:
+                size_in_bytes += int(line.split()[2])
+            except (ValueError, IndexError):
+                logging.error(
+                    _(
+                        "Unable to calculate the decompressed size of %s."
+                    ) % ovf_file
+                )
+                return False, -1
 
         dest_dir_stat = os.statvfs(dest_dir)
         dest_dir_size = (dest_dir_stat.f_bavail * dest_dir_stat.f_frsize)
@@ -750,9 +759,9 @@ class ImageUploader(object):
         )
 
         if dest_dir_size > size_in_bytes:
-            return (True, size_in_bytes)
+            return True, size_in_bytes
         else:
-            return (False, size_in_bytes)
+            return False, size_in_bytes
 
     def space_test_nfs(self, remote_dir, desired_size, uid, gid):
         """
@@ -828,10 +837,10 @@ class ImageUploader(object):
         logging.debug("euid(%s) egid(%s)" % (os.geteuid(), os.getegid()))
         umask_save = os.umask(0137)  # Set to 660
         try:
-            src = open(src_file_name, 'r')
+            src = open(src_file_name, 'rb')
             os.setegid(gid)
             os.seteuid(uid)
-            dest = open(dest_file_name, 'w')
+            dest = open(dest_file_name, 'wb')
             self.copyfileobj_sparse(src, dest)
         except Exception, e:
             retVal = False
