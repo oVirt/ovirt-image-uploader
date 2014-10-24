@@ -723,6 +723,11 @@ class ImageUploader(object):
             stderr=subprocess.PIPE,
         )
         outerr = exttar.communicate()
+        rc = exttar.returncode
+        if rc == 2:
+            raise Exception(
+                _("not a gzip file")
+            )
         if outerr[1] != '':
             logging.error(
                 _(
