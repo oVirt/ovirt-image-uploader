@@ -497,25 +497,41 @@ class ImageUploader(object):
                     )
                     return False
             except RequestError as re_e:
+                UNABLE_TO_CONNECT = _(
+                    "Unable to connect to REST API at {url}\n"
+                )
+                REQ_ERRORS = {
+                    401: UNABLE_TO_CONNECT + _(
+                        "Host returned a 401 Unauthorized error.\n"
+                        "Please check the provided username and password."
+                        ),
+                    503: UNABLE_TO_CONNECT + _(
+                        "Host returned a 503 Service Unavailable error.\n"
+                        "Please ensure the engine is running and "
+                        "the webUI is accessible."
+                        ),
+                    }
+                GENERIC_REQ_ERROR = UNABLE_TO_CONNECT + _(
+                    "Reason: {reason}\n"
+                    "Status: {status}"
+                )
+
                 logging.error(
-                    _(
-                        "Unable to connect to REST API at {url}\n"
-                        "Reason: {reason}"
-                    ).format(
+                    REQ_ERRORS.get(re_e.status, GENERIC_REQ_ERROR).format(
                         url=url,
                         reason=re_e.reason,
+                        status=re_e.status,
                     ),
-
                 )
                 return False
-            except ConnectionError:
+            except ConnectionError as ce:
                 logging.error(
                     _(
                         "Problem connecting to the REST API at {url}\n"
-                        "Is the service available and does the CA certificate "
-                        "exist?"
+                        "{ex}"
                     ).format(
                         url=url,
+                        ex=str(ce.args[0]),
                     )
                 )
                 return False
