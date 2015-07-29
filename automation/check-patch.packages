@@ -1,0 +1,6 @@
+make
+autoconf
+automake
+gettext-devel
+python-lxml
+python2-devel

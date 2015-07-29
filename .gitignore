@@ -17,5 +17,6 @@ tmp.*
 *.pyc
 *.pyo
 *~
+*.sw?
 src/config.py
 src/logrotate.d/ovirt-image-uploader
