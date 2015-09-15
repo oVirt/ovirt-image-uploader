@@ -1971,7 +1971,7 @@ class ImageUploader(object):
             self.caller.call(cmd)
             dest_dir = os.path.join(mount_dir, remote_path)
             for ovf_file in self.configuration.files:
-                if os.path.isdir(ovf_file) is True:
+                if os.path.isdir(ovf_file):
                     logging.debug('OVF data %s is a directory' % ovf_file)
                     ovf_file_size = self.get_ovf_dir_space(ovf_file)
                     if ovf_file_size != -1 and self.update_ovf_xml(ovf_file):
@@ -1982,7 +1982,7 @@ class ImageUploader(object):
                             ovf_file_size,
                             ovf_file
                         )
-                else:
+                elif os.path.isfile(ovf_file):
                     try:
                         ovf_extract_dir = tempfile.mkdtemp()
                         logging.debug(
@@ -2038,6 +2038,16 @@ class ImageUploader(object):
                         except Exception, e:
                             ExitCodes.exit_code = ExitCodes.CLEANUP_ERR
                             logging.debug(e)
+                else:
+                    ExitCodes.exit_code = ExitCodes.CRITICAL
+                    logging.error(
+                        _(
+                            'OVF data not found: {ovf_file}\n'
+                            'Must be a gzip-compressed file or a directory.'
+                        ).format(
+                            ovf_file=ovf_file,
+                        )
+                    )
 
         except KeyError:
             ExitCodes.exit_code = ExitCodes.CRITICAL
