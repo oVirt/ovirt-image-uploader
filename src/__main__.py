@@ -456,7 +456,7 @@ class ImageUploader(object):
                     "the oVirt Engine REST API."
                 )
 
-            url = "https://" + self.configuration.get("engine") + "/api"
+            url = "https://" + self.configuration.get("engine") + "/ovirt-engine/api"
 
             try:
                 # If "insecure" option was provided, use it during API creation
