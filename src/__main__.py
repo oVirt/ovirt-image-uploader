@@ -456,7 +456,11 @@ class ImageUploader(object):
                     "the oVirt Engine REST API."
                 )
 
-            url = "https://" + self.configuration.get("engine") + "/ovirt-engine/api"
+            url = (
+                "https://" +
+                self.configuration.get("engine") +
+                "/ovirt-engine/api"
+            )
 
             try:
                 # If "insecure" option was provided, use it during API creation
@@ -826,7 +830,7 @@ class ImageUploader(object):
             self,
             fsrc,
             fdst,
-            length=16*1024,
+            length=16 * 1024,
             make_sparse=True,
             bar_length=40,
             quiet=True,
@@ -845,7 +849,7 @@ class ImageUploader(object):
             buf = fsrc.read(length)
             if not buf:
                 break
-            if make_sparse and buf == '\0'*len(buf):
+            if make_sparse and buf == '\0' * len(buf):
                 fdst.seek(len(buf), os.SEEK_CUR)
             else:
                 fdst.write(buf)
@@ -1787,6 +1791,7 @@ class ImageUploader(object):
     ):
         """
         Copies all of the files in source_dir to remote_dir.
+        Returns: True if successful and false otherwise.
         """
         files_to_copy = self.get_files_to_copy(source_dir)
         if len(files_to_copy) < 1:
@@ -1794,7 +1799,7 @@ class ImageUploader(object):
                 "The internal directory structure "
                 "of the OVF file is invalid"
             )
-            return
+            return False
 
         # Check for pre-existing files.  We can't just overwrite
         # what is already there.
@@ -1817,7 +1822,7 @@ class ImageUploader(object):
                                         'overwrite it.'
                                     ) % (remote_file, address)
                                 )
-                                return
+                                return False
                             else:
                                 # Remove the file.
                                 self.remove_file_nfs(
@@ -1846,7 +1851,7 @@ class ImageUploader(object):
                         ovf_size
                     )
                 )
-                return
+                return False
 
         # Make the remote directories
         for valid_files in files_to_copy:
@@ -1882,15 +1887,18 @@ class ImageUploader(object):
                                     NUMERIC_VDSM_ID,
                                     NUMERIC_VDSM_ID
                             ):
-                                return
+                                return False
 
         # Copy the .ovf *last*
-        self.copy_file_nfs(
+        if not self.copy_file_nfs(
             ovf_file,
             remote_ovf_file,
             NUMERIC_VDSM_ID,
             NUMERIC_VDSM_ID
-        )
+        ):
+            return False
+
+        return True
 
     def remove_file_nfs(self, file_name, uid, gid):
         """
@@ -1975,13 +1983,14 @@ class ImageUploader(object):
                     logging.debug('OVF data %s is a directory' % ovf_file)
                     ovf_file_size = self.get_ovf_dir_space(ovf_file)
                     if ovf_file_size != -1 and self.update_ovf_xml(ovf_file):
-                        self.copy_files_nfs(
+                        if not self.copy_files_nfs(
                             ovf_file,
                             dest_dir,
                             address,
                             ovf_file_size,
                             ovf_file
-                        )
+                        ):
+                            ExitCodes.exit_code = ExitCodes.UPLOAD_ERR
                 elif os.path.isfile(ovf_file):
                     try:
                         ovf_extract_dir = tempfile.mkdtemp()
@@ -2001,13 +2010,16 @@ class ImageUploader(object):
                         if retVal:
                             if self.unpack_ovf(ovf_file, ovf_extract_dir):
                                 if (self.update_ovf_xml(ovf_extract_dir)):
-                                    self.copy_files_nfs(
+                                    if not self.copy_files_nfs(
                                         ovf_extract_dir,
                                         dest_dir,
                                         address,
                                         ovf_file_size,
                                         ovf_file
-                                    )
+                                    ):
+                                        ExitCodes.exit_code = (
+                                            ExitCodes.UPLOAD_ERR
+                                        )
                         else:
                             if ovf_file_size > 0:
                                 ExitCodes.exit_code = ExitCodes.CRITICAL
