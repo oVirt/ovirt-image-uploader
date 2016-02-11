@@ -10,6 +10,7 @@ SUFFIX=".$(date -u +%Y%m%d%H%M%S).git$(git rev-parse --short HEAD)"
 autoreconf -ivf
 ./configure
 make dist
+yum-builddep ovirt-image-uploader.spec
 rpmbuild \
     -D "_topdir $PWD/tmp.repos" \
     -D "release_suffix ${SUFFIX}" \
