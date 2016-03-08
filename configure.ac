@@ -29,7 +29,7 @@ AC_SUBST([VDSMUSER], [vdsm])
 AC_SUBST([VDSMGROUP], [kvm])
 
 AC_CONFIG_AUX_DIR([.])
-AC_CONFIG_SRCDIR([src/engine-image-uploader.8])
+AC_CONFIG_SRCDIR([src/ovirt-image-uploader.8])
 AC_CONFIG_MACRO_DIR([m4])
 AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE

@@ -10,7 +10,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-#
 
 include $(top_srcdir)/build/python.inc
 
@@ -42,6 +41,7 @@ nodist_ovirtimageuploaderlib_PYTHON = \
 	$(NULL)
 
 dist_man_MANS = \
+	ovirt-image-uploader.8 \
 	engine-image-uploader.8 \
 	$(NULL)
 
@@ -68,10 +68,13 @@ install-data-hook:
 	$(MKDIR_P) "$(DESTDIR)$(confddir)"
 	$(MKDIR_P) "$(DESTDIR)$(bindir)"
 	$(MKDIR_P) "$(DESTDIR)$(localstatedir)/log/ovirt-engine/$(PACKAGE_NAME)"
-	chmod 640 "$(DESTDIR)$(engineconfigdir)/imageuploader.conf"
 	chmod a+x "$(DESTDIR)$(ovirtimageuploaderlibdir)/__main__.py"
+	chmod 640 "$(DESTDIR)$(engineconfigdir)/imageuploader.conf"
+	rm -f "$(DESTDIR)$(bindir)/ovirt-image-uploader"
 	rm -f "$(DESTDIR)$(bindir)/engine-image-uploader"
-	$(LN_S) "$(ovirtimageuploaderlibdir)/__main__.py" "$(DESTDIR)$(bindir)/engine-image-uploader"
+	$(LN_S) "$(ovirtimageuploaderlibdir)/__main__.py" "$(DESTDIR)$(bindir)/ovirt-image-uploader"
+	$(LN_S) ovirt-image-uploader "$(DESTDIR)$(bindir)/engine-image-uploader"
 
 uninstall-hook:
+	rm -f "$(DESTDIR)$(bindir)/ovirt-image-uploader"
 	rm -f "$(DESTDIR)$(bindir)/engine-image-uploader"

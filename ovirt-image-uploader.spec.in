@@ -73,6 +73,7 @@ make %{?_smp_mflags} install DESTDIR="%{buildroot}"
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{package_name}
 %{python2_sitelib}/ovirt_image_uploader/*.py*
 %{python2_sitelib}/ovirt_image_uploader/ovf/*.py*
+%{_bindir}/ovirt-image-uploader
 %{_bindir}/engine-image-uploader
 %{_mandir}/man8/*
 
