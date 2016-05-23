@@ -415,6 +415,10 @@ class Configuration(dict):
 class ImageUploader(object):
 
     def __init__(self, conf):
+        logging.warning(
+            'ovirt-image-uploader is deprecated in 4.0 and will be removed '
+            'in 4.1'
+        )
         self.api = None
         self.configuration = conf
         self.caller = Caller(self.configuration)
