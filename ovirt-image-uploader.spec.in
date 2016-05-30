@@ -31,7 +31,7 @@ BuildArch:	noarch
 Requires:	python
 Requires:	python-lxml
 Requires(pre):	shadow-utils
-Requires:	ovirt-engine-sdk-python >= 3.6.3.0
+Requires:	python-ovirt-engine-sdk4 >= 4.0.0
 Requires:	logrotate
 BuildRequires:	gettext
 BuildRequires:	python2-devel

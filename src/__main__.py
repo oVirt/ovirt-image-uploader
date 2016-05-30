@@ -17,9 +17,8 @@ import getpass
 import time
 from lxml import etree
 from ovf import ovfenvelope
-from ovirtsdk.api import API
-from ovirtsdk.infrastructure.errors import RequestError, ConnectionError
-from ovirtsdk.infrastructure.errors import NoCertificatesError
+
+import ovirtsdk4
 
 from ovirt_image_uploader import config
 
@@ -467,32 +466,24 @@ class ImageUploader(object):
             )
 
             try:
-                # If "insecure" option was provided, use it during API creation
-                if self.configuration.get("insecure"):
-                    self.api = API(
-                        url=url,
-                        username=self.configuration.get("user"),
-                        password=self.configuration.get("passwd"),
-                        insecure=True,
-                    )
-                else:
-                    self.api = API(
-                        url=url,
-                        username=self.configuration.get("user"),
-                        password=self.configuration.get("passwd"),
-                        ca_file=self.configuration.get("cert_file"),
-                    )
-
-                pi = self.api.get_product_info()
+                self.api = ovirtsdk4.Connection(
+                    url=url,
+                    username=self.configuration.get("user"),
+                    password=self.configuration.get("passwd"),
+                    ca_file=self.configuration.get("cert_file"),
+                    insecure=bool(self.configuration.get("insecure")),
+                )
+                svc = self.api.system_service().get()
+                pi = svc.product_info
                 if pi is not None:
                     vrm = '%s.%s.%s' % (
-                        pi.get_version().get_major(),
-                        pi.get_version().get_minor(),
-                        pi.get_version().get_revision()
+                        pi.version.major,
+                        pi.version.minor,
+                        pi.version.revision
                     )
                     logging.debug(
                         "API Vendor(%s)\tAPI Version(%s)",
-                        pi.get_vendor(),
+                        pi.vendor,
                         vrm
                     )
                 else:
@@ -504,54 +495,16 @@ class ImageUploader(object):
                         )
                     )
                     return False
-            except RequestError as re_e:
-                UNABLE_TO_CONNECT = _(
-                    "Unable to connect to REST API at {url}\n"
-                )
-                REQ_ERRORS = {
-                    401: UNABLE_TO_CONNECT + _(
-                        "Host returned a 401 Unauthorized error.\n"
-                        "Please check the provided username and password."
-                        ),
-                    503: UNABLE_TO_CONNECT + _(
-                        "Host returned a 503 Service Unavailable error.\n"
-                        "Please ensure the engine is running and "
-                        "the webUI is accessible."
-                        ),
-                    }
-                GENERIC_REQ_ERROR = UNABLE_TO_CONNECT + _(
-                    "Reason: {reason}\n"
-                    "Status: {status}"
-                )
-
+            except ovirtsdk4.Error as e:
+                # this is the only exception raised by SDK :(
                 logging.error(
-                    REQ_ERRORS.get(re_e.status, GENERIC_REQ_ERROR).format(
+                    _(
+                        "Unable to connect to REST API at {url} due to SDK "
+                        "error\nMessage: {e}"
+                    ).format(
                         url=url,
-                        reason=re_e.reason,
-                        status=re_e.status,
+                        e=e,
                     ),
-                )
-                return False
-            except ConnectionError as ce:
-                logging.error(
-                    _(
-                        "Problem connecting to the REST API at {url}\n"
-                        "{ex}"
-                    ).format(
-                        url=url,
-                        ex=str(ce.args[0]),
-                    )
-                )
-                return False
-            except NoCertificatesError:
-                logging.error(
-                    _(
-                        "Problem connecting to the REST API at {url}\n"
-                        "The CA is invalid. To override use the \'insecure\' "
-                        "option."
-                    ).format(
-                        url=url,
-                    )
                 )
                 return False
             except Exception as e:
@@ -577,55 +530,43 @@ class ImageUploader(object):
         if not self._initialize_api():
             sys.exit(ExitCodes.CRITICAL)
 
-        dcAry = self.api.datacenters.list()
-        if dcAry is not None:
+        svc = self.api.system_service()
+        domainAry = svc.storage_domains_service().list()
+        if domainAry is not None:
             imageAry = []
-            for dc in dcAry:
-                dcName = dc.get_name()
-                logging.debug("Found a DC named(%s)" % dcName)
-                domainAry = dc.storagedomains.list()
-                if domainAry is not None:
-                    for domain in domainAry:
-                        if domain.get_type() == 'export':
-                            status = domain.get_status()
-                            if status is not None:
-                                imageAry.append(
-                                    [
-                                        domain.get_name(),
-                                        dcName,
-                                        status.get_state()
-                                    ]
-                                )
-                            else:
-                                logging.debug(
-                                    "the storage domain didn't have a status "
-                                    "element."
-                                )
-                else:
-                    logging.debug(
-                        _("DC(%s) does not have a storage domain.") % dcName
-                    )
+            for domain in domainAry:
+                if domain.type.value == 'export':
+                    status = domain.external_status
+                    if status is not None:
+                        imageAry.append(
+                            [
+                                domain.name,
+                                status.value
+                            ]
+                        )
+                    else:
+                        logging.debug(
+                            "the storage domain didn't have a status "
+                            "element."
+                        )
             if len(imageAry) > 0:
                 imageAry.sort(key=get_name)
-                fmt = "%-30s | %-25s | %s"
+                fmt = "%-30s | %s"
                 print fmt % (
                     _("Export Storage Domain Name"),
-                    _("Datacenter"),
                     _("Export Domain Status")
                 )
                 print "\n".join(
-                    fmt % (name, dcName, status)for name, dcName, status
-                    in imageAry
+                    fmt % (name, status)
+                    for name, status in imageAry
                 )
             else:
                 ExitCodes.exit_code = ExitCodes.LIST_IMAGE_ERR
-                logging.error(
-                    _("There are no export storage domains.")
-                )
+                logging.error(_("There are no export storage domains."))
         else:
             ExitCodes.exit_code = ExitCodes.LIST_IMAGE_ERR
             logging.error(
-                _("There are no datacenters with Export storage domains.")
+                _("There are no storage domains available.")
             )
 
     def get_host_and_path_from_export_domain(self, exportdomain):
@@ -637,20 +578,24 @@ class ImageUploader(object):
         """
         if not self._initialize_api():
             sys.exit(ExitCodes.CRITICAL)
-        sd = self.api.storagedomains.get(exportdomain)
+        svc = self.api.system_service()
+        sd = None
+        for domain in svc.storage_domains_service().list():
+            if domain.name == exportdomain:
+                sd = domain
         if sd is not None:
-            if sd.get_type() != 'export':
+            if sd.type.value != 'export':
                 raise Exception(
                     _(
                         "The %s storage domain supplied is not "
                         "of type 'export'" % (exportdomain)
                     )
                 )
-            id = sd.get_id()
-            storage = sd.get_storage()
+            id = sd.id
+            storage = sd.storage
             if storage is not None:
-                address = storage.get_address()
-                path = storage.get_path()
+                address = storage.address
+                path = storage.path
             else:
                 raise Exception(
                     _(
