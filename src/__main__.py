@@ -435,6 +435,8 @@ class ImageUploader(object):
         if not self.configuration:
             raise Exception("No configuration.")
 
+        with_kerberos = bool(self.configuration.get("kerberos"))
+
         if self.api is None:
             # The API has not been initialized yet.
             try:
@@ -442,17 +444,20 @@ class ImageUploader(object):
                     "engine",
                     msg=_("hostname of oVirt Engine")
                 )
-                self.configuration.prompt(
-                    "user",
-                    msg=_("REST API username for oVirt Engine")
-                )
-                self.configuration.getpass(
-                    "passwd",
-                    msg=(
-                        _("REST API password for the %s oVirt Engine user") %
-                        self.configuration.get("user")
+                if not with_kerberos:
+                    self.configuration.prompt(
+                        "user",
+                        msg=_("REST API username for oVirt Engine")
                     )
-                )
+                    self.configuration.getpass(
+                        "passwd",
+                        msg=(
+                            _(
+                                "REST API password for the %s oVirt "
+                                "Engine user"
+                            ) % self.configuration.get("user")
+                        )
+                    )
             except Configuration.SkipException:
                 raise Exception(
                     "Insufficient information provided to communicate with "
@@ -472,6 +477,7 @@ class ImageUploader(object):
                     password=self.configuration.get("passwd"),
                     ca_file=self.configuration.get("cert_file"),
                     insecure=bool(self.configuration.get("insecure")),
+                    kerberos=with_kerberos,
                 )
                 svc = self.api.system_service().get()
                 pi = svc.product_info
@@ -2213,6 +2219,18 @@ temporary directory.
         "--passwd",
         dest="passwd",
         help=SUPPRESS_HELP
+    )
+
+    engine_group.add_option(
+        "",
+        "--with-kerberos",
+        dest="kerberos",
+        help=_(
+            "Enable Kerberos authentication instead of the default "
+            "basic authentication."
+        ),
+        action="store_true",
+        default=False
     )
 
     engine_group.add_option(
